@@ -17,14 +17,13 @@ def scrape_all():
         "news_paragraph": news_paragraph,
         "featured_image": featured_image(browser),
         "facts": mars_facts(),
+        "hemispheres": hemispheres(browser),
         "last_modified": dt.datetime.now()
     }
 
     # Stop webdriver and return data
     browser.quit()
     return data
-
-
 
 def mars_news(browser):
 
@@ -52,6 +51,7 @@ def mars_news(browser):
         return None, None
 
     return news_title, news_p
+
 
 def featured_image(browser):
     # Visit URL
@@ -84,10 +84,57 @@ def featured_image(browser):
 
     return img_url
 
-# ## Mars Facts
 def mars_facts():
+    # Add try/except for error handling
     try:
+        # Use 'read_html' to scrape the facts table into a dataframe
         df = pd.read_html('http://space-facts.com/mars/')[0]
-    
+
     except BaseException:
-      return None
+        return None
+
+    # Assign columns and set index of dataframe
+    df.columns=['Description', 'Mars']
+    df.set_index('Description', inplace=True)
+
+    # Convert dataframe into HTML format, add bootstrap
+    return df.to_html(classes="table table-striped")
+
+
+def mars_weather(browser):
+    url = 'https://mars.nasa.gov/insight/weather/'
+    browser.visit(url)
+    html = browser.html
+    weather_soup = soup(html, 'html.parser')
+    try:
+        weather_table = weather_soup.find('table', class_='mb_table')
+    except AttributeError:
+        return None
+    return weather_table
+
+def hemispheres(browser):
+    url = 'https://astrogeology.usgs.gov/search/results?q=hemisphere+enhanced&k1=target&v1=Mars'
+    browser.visit(url)
+    hemisphere_image_urls = []
+
+    # 3. Write code to retrieve the image urls and titles for each hemisphere.
+    mars_hemispheres_html = browser.html
+    mars_hemispheres_soup = soup(mars_hemispheres_html, 'html.parser')
+    mars_hemispheres = mars_hemispheres_soup.find_all('div', class_='description')
+    for image in mars_hemispheres:
+        hemisphere_image_dict = {}
+        hemisphere_url = image.find('a', class_='itemLink')
+        hemisphere = hemisphere_url.get('href')
+        hemisphere_link = 'https://astrogeology.usgs.gov' + hemisphere
+        browser.visit(hemisphere_link)
+        mars_hemispheres_html = browser.html
+        mars_hemispheres_soup = soup(mars_hemispheres_html, 'html.parser')
+        hemisphere_title = mars_hemispheres_soup.find('h2', class_='title').text.replace(' Enhanced', '')
+        hemisphere_link = mars_hemispheres_soup.find('a', text='Original').get('href')
+        hemisphere_image_dict['title'] = hemisphere_title
+        hemisphere_image_dict['img_url'] = hemisphere_link
+        hemisphere_image_urls.append(hemisphere_image_dict)
+    return hemisphere_image_urls
+  
+if __name__ == "__main__":
+    print(scrape_all())
